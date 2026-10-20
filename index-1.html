@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jarvis</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#EDF0F5;--card:#fff;--ink:#16213A;--muted:#5B6781;--line:#D5DBE6;--ready:#2F4B9B;--listen:#D6402F;--proc:#B7791F;--speak:#0E8F7E;--err:#8F1D1D;--errbg:#FBE9E7;--demo:#FFF1C9;--demoink:#6B4A00}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10162A;--card:#1A2240;--ink:#E8ECF7;--muted:#9AA6C4;--line:#2D3760;--ready:#5B7BE0;--errbg:#3A1C1C;--err:#FFB4A8;--demo:#3B3014;--demoink:#F2D98C}}
+:root[data-theme="dark"]{--bg:#10162A;--card:#1A2240;--ink:#E8ECF7;--muted:#9AA6C4;--line:#2D3760;--ready:#5B7BE0;--errbg:#3A1C1C;--err:#FFB4A8;--demo:#3B3014;--demoink:#F2D98C}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:560px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:1.7rem;font-weight:650;letter-spacing:-.02em}
+h2{margin:0 0 8px;font-size:1rem;font-weight:650}
+.demo{background:var(--demo);color:var(--demoink);border-radius:10px;padding:10px 12px;font-size:.88rem;line-height:1.4}
+.stage{display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 0}
+.mic{width:128px;height:128px;border-radius:50%;border:0;background:var(--ready);color:#fff;display:grid;place-items:center;position:relative;transition:background .2s}
+.mic svg{width:52px;height:52px}
+.mic[data-s=listening]{background:var(--listen)}.mic[data-s=processing]{background:var(--proc)}.mic[data-s=speaking]{background:var(--speak)}.mic[data-s=error]{background:var(--err);color:#fff}
+.mic:disabled{opacity:.6}
+.mic[data-s=listening]::after,.mic[data-s=speaking]::after{content:"";position:absolute;inset:-10px;border-radius:50%;border:3px solid var(--listen);animation:p 1.2s ease-out infinite}
+.mic[data-s=speaking]::after{border-color:var(--speak)}
+@keyframes p{from{transform:scale(.92);opacity:.6}to{transform:scale(1.18);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mic::after{animation:none!important}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #7A9BFF;outline-offset:3px}
+.status{font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.label{font-size:.82rem;color:var(--muted);margin-bottom:4px}
+.text{margin:0;line-height:1.5;min-height:1.5em}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn,.chip{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:9px 14px}
+.btn.stop{border-color:var(--listen);color:var(--listen)}
+.btn:disabled{opacity:.45}.chip{font-size:.88rem}
+.err{background:var(--errbg);color:var(--err);border-radius:10px;padding:10px 12px;font-size:.9rem;line-height:1.4}
+.err[hidden]{display:none}
+.f{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.f input,.f select,.vc select,.send input{font:inherit;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);width:100%}
+.f button,.send button{border:0;background:var(--ready);color:#fff;border-radius:10px;padding:11px 16px;font:inherit}
+.send{display:flex;gap:8px}
+.vc{display:flex;flex-direction:column;gap:8px;margin-top:14px}.vc label{font-size:.82rem;color:var(--muted);display:flex;flex-direction:column;gap:4px}.vc input[type=range]{width:100%}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);font-size:.93rem;line-height:1.35}
+li:first-child{border-top:0}li>div{flex:1}
+li input{margin-top:3px;width:18px;height:18px}
+.x{border:0;background:none;color:var(--muted);font-size:1.3rem;padding:0 6px;line-height:1}
+.done{text-decoration:line-through;color:var(--muted)}
+.tag{font-size:.78rem;color:var(--muted)}.tag.od{color:var(--listen);font-weight:600}
+.empty{color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Jarvis</h1>
+<div class="demo" role="note"><b>Your records, saved only on this phone.</b> They live in this browser’s storage: no sync, no backup, no Claude connected, no calendar. Export a backup often, and don’t store sensitive client details until the secure database phase.</div>
+<section class="stage">
+<button class="mic" id="mic" data-s="ready" aria-label="Start listening"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg></button>
+<div class="status" id="status" aria-live="polite">Ready. Tap to talk</div>
+</section>
+<div class="err" id="err" role="alert" hidden></div>
+<section class="card">
+<div class="label">You said</div><p class="text" id="said">…</p>
+<div class="label" style="margin-top:12px">Jarvis</div><p class="text" id="reply">…</p>
+<div class="row"><button class="btn stop" id="stop" disabled>Stop speaking</button><button class="btn" id="repeat" disabled>Repeat</button></div>
+<div class="vc"><label>Voice<select id="voice"></select></label><label>Pitch (lower is deeper)<input type="range" id="pitch" min="0.5" max="1.2" step="0.05" value="0.85"></label><label>Speed<input type="range" id="rate" min="0.7" max="1.3" step="0.05" value="0.95"></label></div>
+</section>
+<div class="row" id="chips" style="margin-top:0"></div>
+<form class="send" id="form"><input id="txt" placeholder="Or type a request" aria-label="Type a request" autocomplete="off"><button type="submit">Send</button></form>
+<section class="card"><h2>Add a task</h2>
+<form class="f" id="tf"><select id="tp" aria-label="Project"></select><input id="tt" placeholder="Task" required autocomplete="off"><input id="td" type="date" aria-label="Due date"><button>Add task</button></form></section>
+<section class="card"><h2>Add a note, blocker or decision</h2>
+<form class="f" id="nf"><select id="np" aria-label="Project"></select><select id="nk" aria-label="Type"><option value="note">Note</option><option value="blocker">Blocker</option><option value="decision">Decision</option></select><input id="nt" placeholder="Text" required autocomplete="off"><button>Save</button></form></section>
+<section class="card"><h2>Records</h2>
+<select id="flt" class="f" aria-label="Filter by project" style="width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:inherit"></select>
+<div class="label" style="margin-top:12px">Tasks</div><ul id="tasks"></ul>
+<div class="label" style="margin-top:12px">Notes, blockers, decisions</div><ul id="notes"></ul>
+<div class="row"><button class="btn" id="exp">Export backup</button><button class="btn" id="impb">Import backup</button><input type="file" id="imp" accept="application/json" hidden></div>
+</section>
+</main>
+<script>
+const LANG="en-IN";
+const P=[{id:"allvion",name:"Allvion / Codegene"},{id:"opd",name:"OPD clinic software"},{id:"bms",name:"BMS"},{id:"kh",name:"KH Furnishing"},{id:"video",name:"Video editing"},{id:"aisales",name:"AI Sales OS"},{id:"personal",name:"Personal"}];
+const $=id=>document.getElementById(id);
+const pn=id=>(P.find(p=>p.id===id)||{}).name||id;
+let D={tasks:[],notes:[]};
+function load(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function store(k,v){try{localStorage.setItem(k,v);return true}catch(e){return false}}
+try{const r=load("jarvis_v2");if(r)D=JSON.parse(r)}catch(e){}
+function save(){if(!store("jarvis_v2",JSON.stringify(D)))showErr("Couldn’t save to this browser’s storage. Your changes may be lost.")}
+const today=()=>new Date().toLocaleDateString("en-CA");
+const tomorrow=()=>{const d=new Date();d.setDate(d.getDate()+1);return d.toLocaleDateString("en-CA")};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const cat=t=>!t.due?"none":t.due<today()?"overdue":t.due===today()?"today":"upcoming";
+const rk={overdue:0,today:1,upcoming:2,none:3};
+const dueText=t=>({overdue:"overdue ("+t.due+")",today:"due today",upcoming:"due "+t.due,none:"no due date"})[cat(t)];
+const list=ts=>ts.map(t=>t.title+" for "+pn(t.p)+", "+dueText(t)).join("; ");
+const openT=()=>D.tasks.filter(x=>!x.done).sort((a,b)=>rk[cat(a)]-rk[cat(b)]||(a.due||"9").localeCompare(b.due||"9"));
+const PRE="(?:allvion|codegene|opd clinic software|opd|clinic|bms|kh furnishing|kh|video editing|video|editing|ai sales os|ai sales|personal)";
+function find(t){t=t.toLowerCase();
+ if(/allvion|codegene/.test(t))return"allvion";if(/\bopd\b|clinic/.test(t))return"opd";if(/\bbms\b/.test(t))return"bms";
+ if(/\bkh\b|furnishing/.test(t))return"kh";if(/video|editing/.test(t))return"video";if(/ai sales|lead scor/.test(t))return"aisales";
+ if(/personal/.test(t))return"personal";return null}
+const clean=b=>b.replace(new RegExp("\\s*\\b(?:for|to|in|under)\\s+(?:the\\s+)?(?:project\\s+)?"+PRE+"\\b.*$","i"),"").replace(/\s+(?:by|due|for)?\s*(?:today|tomorrow)\b/i,"").trim();
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+let last=null;
+function respond(input){
+ const q=input.trim(),t=q.toLowerCase();let m;
+ if(m=q.match(/^(?:add|create|new)\s+(?:a\s+)?task\s+(.+)$/i)){
+  const pid=find(m[1]);if(!pid)return"Which project is that task for? Say add task, then the task, then for Allvion, BMS, and so on.";
+  const due=/\btomorrow\b/i.test(m[1])?tomorrow():/\btoday\b/i.test(m[1])?today():"";
+  const title=cap(clean(m[1]));if(!title)return"What should the task say?";
+  D.tasks.push({id:uid(),p:pid,title,due,done:false});save();render();last=pid;
+  return"Saved task for "+pn(pid)+": "+title+(due?", due "+(due===today()?"today":"tomorrow"):", no due date")+"."}
+ if(m=q.match(/^(?:add|save|new)\s+(?:a\s+)?(note|blocker|decision)\s+(.+)$/i)){
+  const pid=find(m[2]);if(!pid)return"Which project is that for? Say it again with for Allvion, BMS, and so on.";
+  const text=cap(clean(m[2]));D.notes.push({id:uid(),p:pid,k:m[1].toLowerCase(),text,ts:today()});save();render();last=pid;
+  return"Saved "+m[1].toLowerCase()+" for "+pn(pid)+": "+text+"."}
+ if(m=t.match(/^(?:complete|finish|mark)\s+(?:task\s+)?(.+?)(?:\s+(?:as\s+)?done)?$/)){
+  const w=m[1].split(/\s+/).filter(Boolean),hits=openT().filter(x=>w.every(k=>x.title.toLowerCase().includes(k)));
+  if(hits.length===1){hits[0].done=true;save();render();return"Marked done: "+hits[0].title+"."}
+  return hits.length?"More than one task matches: "+hits.map(x=>x.title).join("; ")+". Be more specific.":"I couldn’t find an open task matching that."}
+ if(/good morning|brief me|what should i do today|tell me about my businesses/.test(t)){
+  const o=openT();if(!o.length)return"Your saved records have no open tasks. I can’t see calendars, so I can’t report meetings. Add tasks below or say add task.";
+  const od=o.filter(x=>cat(x)==="overdue").length,td=o.filter(x=>cat(x)==="today").length,bl=D.notes.filter(n=>n.k==="blocker").length;
+  return"From your saved records. Top priorities: "+list(o.slice(0,3))+". You have "+od+" overdue and "+td+" due today. "+(bl?bl+" blockers are recorded. ":"No blockers are recorded. ")+"No calendar is connected, so I can’t report meetings. Recommended next step: start with the first priority."}
+ if(/follow.?up/.test(t)&&!find(t)){const f=openT().filter(x=>/follow/i.test(x.title));return f.length?"Follow-up tasks: "+list(f)+".":"No open tasks with follow-up in the title. I don’t track prospects separately yet."}
+ if(/commitment|not completed|overdue/.test(t)){const o=openT().filter(x=>cat(x)==="overdue");return o.length?"Overdue items: "+list(o)+".":"You have no overdue tasks in your saved records."}
+ if(/opportunit/.test(t))return"I don’t track opportunities yet. For now, save them as notes or decisions under a project.";
+ const pid=find(t)||(/block|next|status|update|more|detail|this week/.test(t)?last:null);
+ if(pid){last=pid;const nm=pn(pid),k=D.notes.filter(n=>n.p===pid),b=k.filter(n=>n.k==="blocker");
+  if(/block/.test(t))return b.length?nm+" blockers: "+b.map(n=>n.text).join("; ")+".":"No blockers are recorded for "+nm+".";
+  const o=openT().filter(x=>x.p===pid);
+  if(!o.length&&!k.length)return"I have no saved records for "+nm+" yet. Tell me what is happening there, and add tasks or notes."+(pid==="bms"?" What does BMS cover, and who are its customers?":"");
+  return nm+", from your saved records. "+(o.length?"Open tasks: "+list(o)+". ":"No open tasks. ")+(b.length?"Blockers: "+b.map(n=>n.text).join("; ")+". ":"")+(k.filter(n=>n.k!=="blocker").length?"Latest notes: "+k.filter(n=>n.k!=="blocker").slice(-2).map(n=>n.text).join("; ")+".":"")}
+ return"I can brief you, give a project update, list overdue or follow-up tasks, and add tasks or notes. Try: add task call the clinic tomorrow for OPD."}
+
+const LABEL={ready:"Ready. Tap to talk",listening:"Listening…",processing:"Processing…",speaking:"Speaking…",error:"Error"};
+const ERR={"not-allowed":"Microphone access is blocked. Tap the lock icon in Chrome’s address bar, allow Microphone, then tap the mic again. If it stays blocked, type below.",
+"service-not-allowed":"Microphone access is blocked here. Type your request below.",
+network:"Speech recognition needs an internet connection. Check your connection or type below.",
+"no-speech":"No speech detected. Tap the mic and try again, or type below.",
+"audio-capture":"No microphone found on this device.",unsupported:"This browser has no speech recognition. Use Chrome on Android, or type below."};
+let state="ready",lastReply="",rec=null;
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition,synth=window.speechSynthesis;
+function set(s){state=s;$("mic").dataset.s=s;$("status").textContent=LABEL[s];
+ $("mic").disabled=s==="processing"||!SR;$("stop").disabled=s!=="speaking";$("mic").setAttribute("aria-label",s==="listening"?"Stop listening":"Start listening")}
+function showErr(m){$("err").textContent=m;$("err").hidden=!m}
+function voices(){return synth?synth.getVoices():[]}
+function speak(msg){
+ if(!synth){set("ready");return}
+ synth.cancel();set("speaking");
+ const u=new SpeechSynthesisUtterance(msg);u.lang=LANG;
+ const v=voices().find(x=>x.voiceURI===$("voice").value);if(v){u.voice=v;u.lang=v.lang}
+ u.pitch=+$("pitch").value;u.rate=+$("rate").value;
+ u.onend=()=>{if(state==="speaking")set("ready")};
+ u.onerror=e=>{if(e.error==="interrupted"||e.error==="canceled"){if(state==="speaking")set("ready");return}
+  showErr("Couldn’t play audio ("+e.error+"). Tap Repeat to try again.");set("error")};
+ synth.speak(u)}
+function handle(q){
+ q=q.trim();if(!q)return;
+ if(synth)synth.cancel();
+ $("said").textContent=q;showErr("");set("processing");
+ setTimeout(()=>{lastReply=respond(q);$("reply").textContent=lastReply;$("repeat").disabled=!synth;speak(lastReply)},300)}
+$("mic").onclick=()=>{
+ if(state==="listening"){rec&&rec.stop();return}
+ if(synth)synth.cancel();
+ showErr("");$("said").textContent="…";$("reply").textContent="…";set("listening");
+ let fin="";
+ try{
+  rec=new SR();rec.lang=LANG;rec.interimResults=true;rec.continuous=false;
+  rec.onresult=ev=>{let i2="";for(let i=ev.resultIndex;i<ev.results.length;i++){const r=ev.results[i];if(r.isFinal)fin+=r[0].transcript;else i2+=r[0].transcript}
+   $("said").textContent=(fin+i2).trim()||"…"};
+  rec.onerror=ev=>{showErr(ERR[ev.error]||"Speech recognition failed ("+ev.error+"). Try again or type below.");set("error")};
+  rec.onend=()=>{if(fin.trim())handle(fin);else if(state==="listening"){showErr("I didn’t catch that. Tap the mic and try again.");set("ready")}};
+  rec.start()}catch(e){showErr("Couldn’t start the microphone. Type your request below.");set("error")}};
+$("stop").onclick=()=>{if(synth)synth.cancel();set("ready")};
+$("repeat").onclick=()=>{if(lastReply)speak(lastReply)};
+$("form").onsubmit=e=>{e.preventDefault();handle($("txt").value);$("txt").value=""};
+["Good morning, Jarvis","Which prospects need follow-up?","What commitments have I not completed?"].forEach(c=>{
+ const b=document.createElement("button");b.className="chip";b.type="button";b.textContent=c;b.onclick=()=>handle(c);$("chips").appendChild(b)});
+["tp","np"].forEach(id=>P.forEach(p=>$(id).add(new Option(p.name,p.id))));
+$("flt").add(new Option("All projects","all"));P.forEach(p=>$("flt").add(new Option(p.name,p.id)));
+$("flt").onchange=()=>render();
+$("tf").onsubmit=e=>{e.preventDefault();const title=$("tt").value.trim();if(!title)return;
+ D.tasks.push({id:uid(),p:$("tp").value,title,due:$("td").value,done:false});save();$("tt").value="";$("td").value="";render()};
+$("nf").onsubmit=e=>{e.preventDefault();const text=$("nt").value.trim();if(!text)return;
+ D.notes.push({id:uid(),p:$("np").value,k:$("nk").value,text,ts:today()});save();$("nt").value="";render()};
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+function render(){
+ const f=$("flt").value,ok=x=>f==="all"||x.p===f;
+ const ts=[...D.tasks].filter(ok).sort((a,b)=>(a.done-b.done)||rk[cat(a)]-rk[cat(b)]||(a.due||"9").localeCompare(b.due||"9"));
+ const tl=$("tasks");tl.innerHTML="";
+ if(!ts.length)tl.appendChild(el("li","empty","No tasks yet."));
+ ts.forEach(t=>{const li=el("li"),cb=el("input");cb.type="checkbox";cb.checked=t.done;cb.setAttribute("aria-label","Complete: "+t.title);
+  cb.onchange=()=>{t.done=cb.checked;save();render()};
+  const d=el("div"),a=el("div",t.done?"done":"",t.title),g=el("div","tag"+(cat(t)==="overdue"&&!t.done?" od":""),pn(t.p)+", "+dueText(t));
+  const x=el("button","x","×");x.setAttribute("aria-label","Delete task");x.onclick=()=>{if(confirm("Delete this task?")){D.tasks=D.tasks.filter(y=>y!==t);save();render()}};
+  d.append(a,g);li.append(cb,d,x);tl.appendChild(li)});
+ const ns=D.notes.filter(ok).slice().reverse(),nl=$("notes");nl.innerHTML="";
+ if(!ns.length)nl.appendChild(el("li","empty","Nothing saved yet."));
+ ns.forEach(n=>{const li=el("li"),d=el("div"),a=el("div","",n.text),g=el("div","tag",cap(n.k)+", "+pn(n.p)+", "+n.ts);
+  const x=el("button","x","×");x.setAttribute("aria-label","Delete");x.onclick=()=>{if(confirm("Delete this item?")){D.notes=D.notes.filter(y=>y!==n);save();render()}};
+  d.append(a,g);li.append(d,x);nl.appendChild(li)})}
+$("exp").onclick=()=>{const b=new Blob([JSON.stringify(D,null,1)],{type:"application/json"}),a=document.createElement("a");
+ a.href=URL.createObjectURL(b);a.download="jarvis-backup-"+today()+".json";a.click()};
+$("impb").onclick=()=>$("imp").click();
+$("imp").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const j=JSON.parse(r.result);if(!Array.isArray(j.tasks)||!Array.isArray(j.notes))throw 0;
+  if(confirm("Replace your saved records with this backup?")){D={tasks:j.tasks,notes:j.notes};save();render()}}catch(x){showErr("That file isn’t a valid Jarvis backup.")}};r.readAsText(f)};
+function fillVoices(){
+ const sel=$("voice");if(!synth)return;
+ const vs=voices().filter(v=>/^en/i.test(v.lang));if(!vs.length)return;
+ const saved=load("voice")||sel.value;sel.innerHTML="";
+ vs.forEach(v=>sel.add(new Option(v.name+" ("+v.lang+")",v.voiceURI)));
+ if(vs.some(v=>v.voiceURI===saved))sel.value=saved}
+if(synth){fillVoices();synth.onvoiceschanged=fillVoices}
+const sp=load("pitch"),sr=load("rate");if(sp)$("pitch").value=sp;if(sr)$("rate").value=sr;
+$("voice").onchange=()=>{store("voice",$("voice").value);if(lastReply)speak(lastReply)};
+$("pitch").onchange=()=>store("pitch",$("pitch").value);
+$("rate").onchange=()=>store("rate",$("rate").value);
+render();set("ready");
+if(!SR)showErr("Speech recognition isn’t available in this browser. Use Chrome on Android, or type your request below.");
+</script>
+</body>
+</html>
